@@ -31,7 +31,7 @@ import { argName, colName } from "./drivers/utlis";
 import { Driver as Sqlite3Driver } from "./drivers/better-sqlite3";
 import { Driver as PgDriver } from "./drivers/pg";
 import { Driver as PostgresDriver } from "./drivers/postgres";
-import { Driver as BunDriver } from "./drivers/bun";
+import { BunOptions, Driver as BunDriver } from "./drivers/bun";
 import { Mysql2Options, Driver as MysqlDriver } from "./drivers/mysql2";
 
 // Read input from stdin
@@ -44,7 +44,8 @@ writeOutput(result);
 interface Options {
   runtime?: string;
   driver?: string;
-  mysql2?: Mysql2Options
+  mysql2?: Mysql2Options;
+  bun?: BunOptions;
 }
 
 interface Driver {
@@ -79,8 +80,8 @@ interface Driver {
     columns: Column[]
   ) => Node;
   // Optional methods for driver-specific customizations
-  header?: () => string;
-  formatFilename?: (filename: string) => string;
+  header?: () => string | undefined;
+  formatFilename?: (filename: string) => string | undefined;
 }
 
 function createNodeGenerator(options: Options): Driver {
@@ -98,7 +99,7 @@ function createNodeGenerator(options: Options): Driver {
       return new Sqlite3Driver();
     }
     case "bun": {
-      return new BunDriver();
+      return new BunDriver(options.bun);
     }
   }
   throw new Error(`unknown driver: ${options.driver}`);
@@ -206,10 +207,9 @@ ${query.text}`
         }
       }
       if (nodes) {
-        const outputFilename = driver.formatFilename
-          ? driver.formatFilename(filename)
-          : `${filename.replace(".", "_")}.ts`;
-        const header = driver.header ? driver.header() : undefined;
+        const defaultFilename = `${filename.replace(".", "_")}.ts`;
+        const outputFilename = driver.formatFilename?.(filename) ?? defaultFilename;
+        const header = driver.header?.();
         files.push(
           new File({
             name: outputFilename,
